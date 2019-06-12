@@ -20,7 +20,7 @@ model = dict(
         out_channels=256,
         featmap_strides=[4, 8, 16, 32]),
     bbox_head=dict(
-        type='SharedFCRoIHead',
+        type='SharedFCBBoxHead',
         num_fcs=2,
         in_channels=256,
         fc_out_channels=1024,
@@ -28,23 +28,33 @@ model = dict(
         num_classes=81,
         target_means=[0., 0., 0., 0.],
         target_stds=[0.1, 0.1, 0.2, 0.2],
-        reg_class_agnostic=False))
+        reg_class_agnostic=False,
+        loss_cls=dict(
+            type='CrossEntropyLoss',
+            use_sigmoid=False,
+            loss_weight=1.0),
+        loss_bbox=dict(
+            type='SmoothL1Loss', beta=1.0, loss_weight=1.0)))
 # model training and testing settings
 train_cfg = dict(
     rcnn=dict(
-        pos_iou_thr=0.5,
-        neg_iou_thr=0.5,
-        crowd_thr=1.1,
-        roi_batch_size=512,
-        add_gt_as_proposals=True,
-        pos_fraction=0.25,
-        pos_balance_sampling=False,
-        neg_pos_ub=512,
-        neg_balance_thr=0,
-        min_pos_iou=0.5,
+        assigner=dict(
+            type='MaxIoUAssigner',
+            pos_iou_thr=0.5,
+            neg_iou_thr=0.5,
+            min_pos_iou=0.5,
+            ignore_iof_thr=-1),
+        sampler=dict(
+            type='RandomSampler',
+            num=512,
+            pos_fraction=0.25,
+            neg_pos_ub=-1,
+            add_gt_as_proposals=True),
         pos_weight=-1,
         debug=False))
-test_cfg = dict(rcnn=dict(score_thr=0.05, max_per_img=100, nms_thr=0.5))
+test_cfg = dict(
+    rcnn=dict(
+        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100))
 # dataset settings
 dataset_type = 'CocoDataset'
 data_root = 'data/coco/'

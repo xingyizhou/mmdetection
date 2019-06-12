@@ -5,13 +5,13 @@ from setuptools import find_packages, setup
 
 
 def readme():
-    with open('README.md') as f:
+    with open('README.md', encoding='utf-8') as f:
         content = f.read()
     return content
 
 
 MAJOR = 0
-MINOR = 5
+MINOR = 6
 PATCH = 0
 SUFFIX = ''
 SHORT_VERSION = '{}.{}.{}{}'.format(MAJOR, MINOR, PATCH, SUFFIX)
@@ -89,11 +89,11 @@ if __name__ == '__main__':
         long_description=readme(),
         keywords='computer vision, object detection',
         url='https://github.com/open-mmlab/mmdetection',
-        packages=find_packages(),
+        packages=find_packages(exclude=('configs', 'tools', 'demo')),
         package_data={'mmdet.ops': ['*/*.so']},
         classifiers=[
             'Development Status :: 4 - Beta',
-            'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+            'License :: OSI Approved :: Apache Software License',
             'Operating System :: OS Independent',
             'Programming Language :: Python :: 2',
             'Programming Language :: Python :: 2.7',
@@ -102,11 +102,11 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.5',
             'Programming Language :: Python :: 3.6',
         ],
-        license='GPLv3',
+        license='Apache License 2.0',
         setup_requires=['pytest-runner'],
         tests_require=['pytest'],
         install_requires=[
-            'mmcv', 'numpy', 'matplotlib', 'six', 'terminaltables',
+            'mmcv>=0.2.6', 'numpy', 'matplotlib', 'six', 'terminaltables',
             'pycocotools'
         ],
         zip_safe=False)

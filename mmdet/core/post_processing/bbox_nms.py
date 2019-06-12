@@ -1,9 +1,14 @@
 import torch
 
-from mmdet.ops import nms
+from mmdet.ops.nms import nms_wrapper
 
 
-def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_thr, max_num=-1):
+def multiclass_nms(multi_bboxes,
+                   multi_scores,
+                   score_thr,
+                   nms_cfg,
+                   max_num=-1,
+                   score_factors=None):
     """NMS for multi-class bboxes.
 
     Args:
@@ -14,6 +19,8 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_thr, max_num=-1):
         nms_thr (float): NMS IoU threshold
         max_num (int): if there are more than max_num bboxes after NMS,
             only top max_num will be kept.
+        score_factors (Tensor): The factors multiplied to scores before
+            applying NMS
 
     Returns:
         tuple: (bboxes, labels), tensors of shape (k, 5) and (k, 1). Labels
@@ -21,6 +28,9 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_thr, max_num=-1):
     """
     num_classes = multi_scores.shape[1]
     bboxes, labels = [], []
+    nms_cfg_ = nms_cfg.copy()
+    nms_type = nms_cfg_.pop('type', 'nms')
+    nms_op = getattr(nms_wrapper, nms_type)
     for i in range(1, num_classes):
         cls_inds = multi_scores[:, i] > score_thr
         if not cls_inds.any():
@@ -31,12 +41,12 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_thr, max_num=-1):
         else:
             _bboxes = multi_bboxes[cls_inds, i * 4:(i + 1) * 4]
         _scores = multi_scores[cls_inds, i]
+        if score_factors is not None:
+            _scores *= score_factors[cls_inds]
         cls_dets = torch.cat([_bboxes, _scores[:, None]], dim=1)
-        # perform nms
-        nms_keep = nms(cls_dets, nms_thr)
-        cls_dets = cls_dets[nms_keep, :]
+        cls_dets, _ = nms_op(cls_dets, **nms_cfg_)
         cls_labels = multi_bboxes.new_full(
-            (len(nms_keep), ), i - 1, dtype=torch.long)
+            (cls_dets.shape[0], ), i - 1, dtype=torch.long)
         bboxes.append(cls_dets)
         labels.append(cls_labels)
     if bboxes:

@@ -23,22 +23,26 @@ model = dict(
         anchor_strides=[4, 8, 16, 32, 64],
         target_means=[.0, .0, .0, .0],
         target_stds=[1.0, 1.0, 1.0, 1.0],
-        use_sigmoid_cls=True))
+        loss_cls=dict(
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)))
 # model training and testing settings
 train_cfg = dict(
     rpn=dict(
-        pos_fraction=0.5,
-        pos_balance_sampling=False,
-        neg_pos_ub=256,
+        assigner=dict(
+            type='MaxIoUAssigner',
+            pos_iou_thr=0.7,
+            neg_iou_thr=0.3,
+            min_pos_iou=0.3,
+            ignore_iof_thr=-1),
+        sampler=dict(
+            type='RandomSampler',
+            num=256,
+            pos_fraction=0.5,
+            neg_pos_ub=-1,
+            add_gt_as_proposals=False),
         allowed_border=0,
-        crowd_thr=1.1,
-        anchor_batch_size=256,
-        pos_iou_thr=0.7,
-        neg_iou_thr=0.3,
-        neg_balance_thr=0,
-        min_pos_iou=0.3,
         pos_weight=-1,
-        smoothl1_beta=1 / 9.0,
         debug=False))
 test_cfg = dict(
     rpn=dict(

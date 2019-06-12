@@ -1,46 +1,78 @@
 import numpy as np
 import torch
 
-from .gpu_nms import gpu_nms
-from .cpu_nms import cpu_nms
-from .cpu_soft_nms import cpu_soft_nms
+from . import nms_cuda, nms_cpu
+from .soft_nms_cpu import soft_nms_cpu
 
 
-def nms(dets, thresh, device_id=None):
-    """Dispatch to either CPU or GPU NMS implementations."""
+def nms(dets, iou_thr, device_id=None):
+    """Dispatch to either CPU or GPU NMS implementations.
 
+    The input can be either a torch tensor or numpy array. GPU NMS will be used
+    if the input is a gpu tensor or device_id is specified, otherwise CPU NMS
+    will be used. The returned type will always be the same as inputs.
+
+    Arguments:
+        dets (torch.Tensor or np.ndarray): bboxes with scores.
+        iou_thr (float): IoU threshold for NMS.
+        device_id (int, optional): when `dets` is a numpy array, if `device_id`
+            is None, then cpu nms is used, otherwise gpu_nms will be used.
+
+    Returns:
+        tuple: kept bboxes and indice, which is always the same data type as
+            the input.
+    """
+    # convert dets (tensor or numpy array) to tensor
     if isinstance(dets, torch.Tensor):
-        if dets.is_cuda:
-            device_id = dets.get_device()
-        dets = dets.detach().cpu().numpy()
-    assert isinstance(dets, np.ndarray)
-
-    if dets.shape[0] == 0:
-        inds = []
+        is_numpy = False
+        dets_th = dets
+    elif isinstance(dets, np.ndarray):
+        is_numpy = True
+        device = 'cpu' if device_id is None else 'cuda:{}'.format(device_id)
+        dets_th = torch.from_numpy(dets).to(device)
     else:
-        inds = (gpu_nms(dets, thresh, device_id=device_id)
-                if device_id is not None else cpu_nms(dets, thresh))
+        raise TypeError(
+            'dets must be either a Tensor or numpy array, but got {}'.format(
+                type(dets)))
 
+    # execute cpu or cuda nms
+    if dets_th.shape[0] == 0:
+        inds = dets_th.new_zeros(0, dtype=torch.long)
+    else:
+        if dets_th.is_cuda:
+            inds = nms_cuda.nms(dets_th, iou_thr)
+        else:
+            inds = nms_cpu.nms(dets_th, iou_thr)
+
+    if is_numpy:
+        inds = inds.cpu().numpy()
+    return dets[inds, :], inds
+
+
+def soft_nms(dets, iou_thr, method='linear', sigma=0.5, min_score=1e-3):
     if isinstance(dets, torch.Tensor):
-        return dets.new_tensor(inds, dtype=torch.long)
+        is_tensor = True
+        dets_np = dets.detach().cpu().numpy()
+    elif isinstance(dets, np.ndarray):
+        is_tensor = False
+        dets_np = dets
     else:
-        return np.array(inds, dtype=np.int)
+        raise TypeError(
+            'dets must be either a Tensor or numpy array, but got {}'.format(
+                type(dets)))
 
+    method_codes = {'linear': 1, 'gaussian': 2}
+    if method not in method_codes:
+        raise ValueError('Invalid method for SoftNMS: {}'.format(method))
+    new_dets, inds = soft_nms_cpu(
+        dets_np,
+        iou_thr,
+        method=method_codes[method],
+        sigma=sigma,
+        min_score=min_score)
 
-def soft_nms(dets, Nt=0.3, method=1, sigma=0.5, min_score=0):
-    if isinstance(dets, torch.Tensor):
-        _dets = dets.detach().cpu().numpy()
+    if is_tensor:
+        return dets.new_tensor(new_dets), dets.new_tensor(
+            inds, dtype=torch.long)
     else:
-        _dets = dets.copy()
-    assert isinstance(_dets, np.ndarray)
-
-    new_dets, inds = cpu_soft_nms(
-        _dets, Nt=Nt, method=method, sigma=sigma, threshold=min_score)
-
-    if isinstance(dets, torch.Tensor):
-        return dets.new_tensor(
-            inds, dtype=torch.long), dets.new_tensor(new_dets)
-    else:
-        return np.array(
-            inds, dtype=np.int), np.array(
-                new_dets, dtype=np.float32)
+        return new_dets.astype(np.float32), inds.astype(np.int64)

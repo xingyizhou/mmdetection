@@ -46,7 +46,7 @@ FPN structure in [Path Aggregation Network for Instance Segmentation](https://ar
                     end_level=-1,
                     add_extra_convs=False):
             pass
-        
+
         def forward(self, inputs):
             # implementation is ignored
             pass
@@ -82,7 +82,7 @@ which defines the following abstract methods.
 - `extract_feat()`: given an image batch of shape (n, c, h, w), extract the feature map(s).
 - `forward_train()`: forward method of the training mode
 - `simple_test()`: single scale testing without augmentation
-- `aug_test()`: testing without augmentation (multi-scale, flip, etc.)
+- `aug_test()`: testing with augmentation (multi-scale, flip, etc.)
 
 [TwoStageDetector](https://github.com/hellock/mmdetection/blob/master/mmdet/models/detectors/two_stage.py)
 is a good example which shows how to do that.
