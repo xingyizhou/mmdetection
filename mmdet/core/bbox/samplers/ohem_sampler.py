@@ -1,10 +1,16 @@
 import torch
 
-from .base_sampler import BaseSampler
 from ..transforms import bbox2roi
+from .base_sampler import BaseSampler
 
 
 class OHEMSampler(BaseSampler):
+    """
+    Online Hard Example Mining Sampler described in [1]_.
+
+    References:
+        .. [1] https://arxiv.org/pdf/1604.03540.pdf
+    """
 
     def __init__(self,
                  num,
@@ -36,7 +42,7 @@ class OHEMSampler(BaseSampler):
                 label_weights=cls_score.new_ones(cls_score.size(0)),
                 bbox_targets=None,
                 bbox_weights=None,
-                reduce=False)['loss_cls']
+                reduction_override='none')['loss_cls']
             _, topk_loss_inds = loss.topk(num_expected)
         return inds[topk_loss_inds]
 
